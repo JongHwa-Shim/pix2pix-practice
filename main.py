@@ -56,7 +56,7 @@ if LOAD_DATA == True:
 else:
 
     ### preprocessing
-    data_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/sample_data'
+    data_path = r'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/sample'
     conditions, reals = PreProcessing(data_path, target_path=None, mode='jpg') 
 
     ### make dataset
@@ -116,7 +116,7 @@ fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
 """
 fixed_condition_list = []
 
-fixed_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/val'
+fixed_path = r'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
 data_list = os.listdir(fixed_path)
 for i in range(25):
     fixed_condition_path = fixed_path + '/' + data_list[i]

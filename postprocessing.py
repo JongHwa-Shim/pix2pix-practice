@@ -94,7 +94,8 @@ def visualization (data, path, mode='gray'):
 
         sample_image = np.transpose(sample_image,(1,2,0))
         #############################################
-
+        filter = TP()
+        sample_image = filter.Scaling(sample_image, range=[0,1], data_min=-1, data_max=1)
         plt.imsave(path, sample_image, vmin=-1, vmax=1) # image shape should be (H x W x 3)
         
 
