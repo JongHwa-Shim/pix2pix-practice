@@ -13,7 +13,8 @@ from postprocessing import *
 
 ### hyperparameter
 ############################################################################################################################# 
-DEVICE = torch.device("cuda:0")
+#DEVICE = torch.device("cuda:0")
+DEVICE = torch.device("cpu")
 
 LOAD_DATA = False
 SAVE_DATA = False
@@ -27,7 +28,7 @@ TEST_MODE = False
 if TEST_MODE:
     LOAD_MODEL = True
 
-BATCH_SIZE = 64
+BATCH_SIZE = 1
 SHUFFLE = True
 NUM_WORKERS = 0 # multithreading
 
@@ -55,17 +56,17 @@ if LOAD_DATA == True:
 else:
 
     ### preprocessing
-    source_path = r'./data/mnist-in-csv/mnist_test.csv'
-    sources, labels = PreProcessing(source_path, target_path=None, mode='csv') 
+    data_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/sample_data'
+    conditions, reals = PreProcessing(data_path, target_path=None, mode='jpg') 
 
     ### make dataset
     ##############################################################################
     filter = transform_processing()
-    real_process = [filter.to_FloatTensor, filter.Scaling]
-    condition_process = [filter.to_LongTensor]
+    real_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
+    condition_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
     transform = my_transform(real_process=real_process, condition_process=condition_process)
 
-    dataset = Mydataset(sources, labels, transform)
+    dataset = Mydataset(conditions, reals, transform)
 
     if SAVE_DATA:
         save_dataset(dataset, DATASET_PATH)
@@ -103,11 +104,36 @@ D_OPTIMIZER = Adam(D.parameters(), lr=D_LEARNING_RATE)
 
 # fixed vector for visualization
 ##################################
+# fixed latent vector
+"""
 fixed_z = torch.randn((100,100)).to(DEVICE)
-
+"""
+# fixed condition
+"""
 idx = filter.to_LongTensor([[element] for element in range(10)])
 fixed_condition = [idx for _ in range(10)]
 fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
+"""
+fixed_condition_list = []
+
+fixed_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/val'
+data_list = os.listdir(fixed_path)
+for i in range(25):
+    fixed_condition_path = fixed_path + '/' + data_list[i]
+    fixed_condition = image.imread(fixed_condition_path)
+
+    width = fixed_condition.shape[1]
+
+    fixed_condition = fixed_condition[:,0:int(width/2)]
+    fixed_condition_r = fixed_condition[:,:,0:1]
+    fixed_condition_g = fixed_condition[:,:,1:2]
+    fixed_condition_b = fixed_condition[:,:,2:3]
+    fixed_condition = fixed_condition_r/3 + fixed_condition_g/3 + fixed_condition_b/3
+    for process in condition_process:
+        fixed_condition = process(fixed_condition)
+    fixed_condition_list.append(torch.unsqueeze(fixed_condition,0))
+
+fixed_condition = torch.cat(fixed_condition_list, dim=0).to(DEVICE)
 ##################################
 
 
@@ -120,16 +146,19 @@ for times in epoch:
     batch_len = len(dataloader)
     for num, data in enumerate(dataloader):
 
+        data['real'] = data['real'].to(DEVICE)
+        data['condition'] = data['condition'].to(DEVICE) # some trick
+
         ### fitting batch size
         batch_size = data['condition'].size(0)
-        REAL_ANSWER = torch.FloatTensor([[1] for _ in range(batch_size)]).to(DEVICE)
-        FAKE_ANSWER = torch.FloatTensor([[0] for _ in range(batch_size)]).to(DEVICE)
+        REAL_ANSWER = torch.ones([batch_size, 1, 16, 16]).to(DEVICE)
+        FAKE_ANSWER = torch.zeros([batch_size, 1, 16, 16]).to(DEVICE)
 
         G.train()
         D.train()
         ### train discriminator
-        D_input_real = D_input_processing(D, DEVICE, data['real'], data['condition'])
         for i in range(NUM_LEARN_D):
+            D_input_real = D_input_processing(D, DEVICE, data['real'], data['condition'])
             D_result_real = D(D_input_real)
 
             G_input = G_input_processing(G, DEVICE, data['condition'])
@@ -138,11 +167,9 @@ for times in epoch:
             D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
             D_result_fake = D(D_input_fake)
 
-            D_loss, D_loss_real, D_loss_fake = D_CRITERION(D_result_real, 
-                                                            D_result_fake, 
-                                                            real_answer=REAL_ANSWER,
-                                                            fake_answer=FAKE_ANSWER
-                                                            )
+            D_loss_args = {'D_result_real': D_result_real, 'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'fake_answer': FAKE_ANSWER}
+
+            D_loss, D_loss_real, D_loss_fake = D_CRITERION(**D_loss_args)
             D_losses.append(D_loss.data)
 
             D.zero_grad()
@@ -157,7 +184,9 @@ for times in epoch:
             D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
             D_result_fake = D(D_input_fake)
 
-            G_loss = G_CRITERION(D_result_fake, real_answer=REAL_ANSWER)
+            G_loss_args = {'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'real_data': data['real'], 'fake_data': fake_data, 'lambda': 100}
+
+            G_loss = G_CRITERION(**G_loss_args)
             G_losses.append(G_loss.data)
 
             G.zero_grad()
@@ -171,11 +200,10 @@ for times in epoch:
 
     ### visualization 
     G.eval()
-    fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, fixed_z, mode='val')
-    generate_sample = G(fixed_G_input)
-    generate_sample = generate_sample.reshape((100,28,28))
+    fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
+    generate_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
     path = './result/epoch ' + str(times) + '.jpg'
-    visualization(generate_sample,path,mode='gray')
+    visualization(generate_sample,path,mode='rgb')
     #square_plot(generate_sample.cpu().data.numpy(),path)
 
     ### model save

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from make_dataset import *
-
+"""
 x = [[1,2,3,4,5],
     [2,4,6,8,10],
     [1,4,7,10,13]]
@@ -12,6 +12,7 @@ a=1
 
 data = torch.randn((3,3,3))
 data = (data - data.min()) / (data.max() - data.min())
+"""
 """
 x = [[[1,2,3],[4,5,6]], [[7,8,9],[10,11,12]], [[13,14,15],[16,17,18]], [[19,20,21], [22,23,24]]]
 
@@ -54,3 +55,7 @@ filter = transform_processing()
 idx = [[element] for element in range(10)]
 idx = filter.to_LongTensor(idx)
 """
+
+a = torch.ones([25,1,30,30])
+
+b=1

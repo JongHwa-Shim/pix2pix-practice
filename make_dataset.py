@@ -48,6 +48,10 @@ class transform_processing(object):
         data = filter2(data)
         data = data.view(-1)
         return data
+    
+    def final_processing(self,data):
+        data = data.transpose(0,2).transpose(1,2)
+        return data
 
 class my_transform (object):
     def __init__(self, real_process, condition_process=None):
@@ -77,25 +81,25 @@ class my_transform (object):
         
 
 class Mydataset(Dataset):
-    def __init__(self, sources, targets, transform=None, root_dir=None):
-        self.sources = sources
-        self.targets = targets
+    def __init__(self, conditions, reals, transform=None, root_dir=None):
+        self.conditions = conditions
+        self.reals = reals
         self.transform = transform
 
     def __len__(self):
-        return len(self.sources)
+        return len(self.reals)
     
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         sample = {}
-        sample['real'] = self.sources[idx]
+        sample['real'] = self.reals[idx]
 
-        if self.targets == None: # if model don't use condition
+        if self.conditions == None: # if model don't use condition
             sample['condition'] = None
         else:
-            sample['condition'] = self.targets[idx]
+            sample['condition'] = self.conditions[idx]
 
         if self.transform:
             sample = self.transform(sample)

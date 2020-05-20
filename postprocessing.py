@@ -95,7 +95,6 @@ def visualization (data, path, mode='gray'):
         sample_image = np.transpose(sample_image,(1,2,0))
         #############################################
 
-        #sample_image = sample_image.reshape((2560,1206,3))
         plt.imsave(path, sample_image, vmin=-1, vmax=1) # image shape should be (H x W x 3)
         
 
