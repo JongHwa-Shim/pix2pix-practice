@@ -13,14 +13,14 @@ from postprocessing import *
 
 ### hyperparameter
 ############################################################################################################################# 
-#DEVICE = torch.device("cuda:0")
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("cuda:0")
+#DEVICE = torch.device("cpu")
 
 LOAD_DATA = False
 SAVE_DATA = False
 LOAD_MODEL = False
 SAVE_MODEL = False
-DATASET_PATH = "./data/mnist-in-csv/mnist_train.csv"
+DATASET_PATH = ""
 G_PATH = "./model/generator.pkl"
 D_PATH = "./model/discriminator.pkl"
 
@@ -56,7 +56,7 @@ if LOAD_DATA == True:
 else:
 
     ### preprocessing
-    data_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/sample_data'
+    data_path = 'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/sample'
     conditions, reals = PreProcessing(data_path, target_path=None, mode='jpg') 
 
     ### make dataset
@@ -116,7 +116,7 @@ fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
 """
 fixed_condition_list = []
 
-fixed_path = r'./data/pix2pix-dataset/edges2shoes/edges2shoes/val'
+fixed_path = 'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
 data_list = os.listdir(fixed_path)
 for i in range(25):
     fixed_condition_path = fixed_path + '/' + data_list[i]
@@ -203,7 +203,7 @@ for times in epoch:
     fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
     generate_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
     path = './result/epoch ' + str(times) + '.jpg'
-    visualization(generate_sample,path,mode='rgb')
+    visualization(generate_sample,path,mode='RGB')
     #square_plot(generate_sample.cpu().data.numpy(),path)
 
     ### model save
