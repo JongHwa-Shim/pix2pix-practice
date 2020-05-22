@@ -1,4 +1,5 @@
 import os
+import numpy
 from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib import image
@@ -47,7 +48,14 @@ def PreProcessing(source_path, target_path=None, mode=None):
         data_list = os.listdir(source_path)
         for file_name in data_list:
             file_path = root_path + '/' + file_name
+
             img = image.imread(file_path)
+            ## image resize
+            """
+            img = Image.open(file_path)
+            img = img.resize((128,64))
+            img = numpy.array(img)
+            """
 
             height = img.shape[0]
             width = img.shape[1]
