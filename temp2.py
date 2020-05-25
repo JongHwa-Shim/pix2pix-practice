@@ -1,6 +1,13 @@
 import numpy as np
 import torch
 from make_dataset import *
+import time
+start_time = time.time()
+end_time = time.time()
+running_time = int(start_time - end_time)
+hour = int(running_time / 3600)
+minute = int((running_time - hour*3600) / 60)
+second = running_time - hour*3600 - minute*60
 """
 x = [[1,2,3,4,5],
     [2,4,6,8,10],

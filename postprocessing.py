@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-
+from make_dataset import transform_processing as TP
 def visualization (data, path, mode='gray'):
 
     # batch will be n^2

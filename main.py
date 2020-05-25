@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import Adam
+import time
 
 from preprocessing import *
 from make_dataset import *
@@ -13,14 +14,17 @@ from postprocessing import *
 
 ### hyperparameter
 ############################################################################################################################# 
-#DEVICE = torch.device("cuda:0")
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("cuda:0")
+#DEVICE = torch.device("cpu")
 
-LOAD_DATA = False
+LOAD_DATA = True
 SAVE_DATA = False
 LOAD_MODEL = False
 SAVE_MODEL = False
-DATASET_PATH = "./data/mnist-in-csv/mnist_train.csv"
+
+DATA_PATH = r'C:/USING_DATA/pix2pix-dataset/edges2shoes/edges2shoes/train'
+DATASET_PATH = r'C:/USING_DATA/saved_data/pix2pix/DATASET'
+
 G_PATH = "./model/generator.pkl"
 D_PATH = "./model/discriminator.pkl"
 
@@ -28,7 +32,7 @@ TEST_MODE = False
 if TEST_MODE:
     LOAD_MODEL = True
 
-BATCH_SIZE = 1
+BATCH_SIZE = 16
 SHUFFLE = True
 NUM_WORKERS = 0 # multithreading
 
@@ -56,7 +60,7 @@ if LOAD_DATA == True:
 else:
 
     ### preprocessing
-    data_path = r'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/sample'
+    data_path = DATA_PATH
     conditions, reals = PreProcessing(data_path, target_path=None, mode='jpg') 
 
     ### make dataset
@@ -116,7 +120,7 @@ fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
 """
 fixed_condition_list = []
 
-fixed_path = r'C:/DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
+fixed_path = r'C:/USING_DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
 data_list = os.listdir(fixed_path)
 for i in range(25):
     fixed_condition_path = fixed_path + '/' + data_list[i]
@@ -129,6 +133,9 @@ for i in range(25):
     fixed_condition_g = fixed_condition[:,:,1:2]
     fixed_condition_b = fixed_condition[:,:,2:3]
     fixed_condition = fixed_condition_r/3 + fixed_condition_g/3 + fixed_condition_b/3
+
+    filter = transform_processing()
+    condition_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
     for process in condition_process:
         fixed_condition = process(fixed_condition)
     fixed_condition_list.append(torch.unsqueeze(fixed_condition,0))
@@ -141,6 +148,8 @@ fixed_condition = torch.cat(fixed_condition_list, dim=0).to(DEVICE)
 ##########################################################################################
 epoch = range(EPOCH)
 for times in epoch:
+    start_time = time.time()
+
     D_losses = []
     G_losses = []
     batch_len = len(dataloader)
@@ -193,17 +202,25 @@ for times in epoch:
             G_loss.backward()
             G_OPTIMIZER.step()
 
-    print("Epoch: " + str(times))
-
     ### log
+    #####################################
+    end_time = time.time()
+    running_time = int(end_time - start_time)
+    hour = int(running_time / 3600)
+    minute = int((running_time - hour*3600) / 60)
+    second = running_time - hour*3600 - minute*60
+
+    print("Epoch: " + str(times))
+    print("Time: " + str(hour) + 'h' + '   ' + str(minute) + 'm' + '   '+ str(second) + 's')
     print("Average G Loss:", float(sum(G_losses)/len(G_losses)), "     Average D Loss", float(sum(D_losses)/len(D_losses)), "\n")
+    #####################################
 
     ### visualization 
-    G.eval()
+    #G.eval()
     fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
     generate_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
     path = './result/epoch ' + str(times) + '.jpg'
-    visualization(generate_sample,path,mode='rgb')
+    visualization(generate_sample,path,mode='RGB')
     #square_plot(generate_sample.cpu().data.numpy(),path)
 
     ### model save

@@ -6,4 +6,4 @@ def pixel_analysis(path):
     plt.imshow(img)
     plt.show()
 
-pixel_analysis("./data/pix2pix-dataset/edges2shoes/edges2shoes/train/1_AB.jpg")
+#pixel_analysis("./data/pix2pix-dataset/edges2shoes/edges2shoes/train/1_AB.jpg")
