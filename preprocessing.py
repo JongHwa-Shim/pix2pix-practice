@@ -7,7 +7,7 @@ import torch
 from torchvision import transforms
 from sklearn.preprocessing import MinMaxScaler
 
-def PreProcessing(source_path, target_path=None, mode=None):
+def deprecate(source_path, target_path=None, mode=None):
     sources = []
     targets = []
 
@@ -66,3 +66,16 @@ def PreProcessing(source_path, target_path=None, mode=None):
     return sources, targets
     # source = condition, target = real
 
+def PreProcessing(data_path):
+    source_list = []
+    target_list = []
+
+    root = data_path
+    data_list = os.listdir(root)
+
+    for data in data_list:
+        data_path = root + '/' + data
+        source_list.append(data_path)
+        target_list.append(data_path)
+    
+    return source_list, target_list

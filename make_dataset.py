@@ -4,9 +4,51 @@ import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 from PIL import Image
+from matplotlib import image
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
 class transform_processing(object):
+    def __init__(self, real_mode=None, condition_mode=None):
+        self.real_mode = real_mode
+        self.condition_mode = condition_mode
+
+    def first_processing_real(self, data):
+        if self.real_mode==None:
+            print('please select real mode')
+            return None
+        
+        elif self.real_mode=='jpg':
+            img = image.imread(data)
+
+            height = img.shape[0]
+            width = img.shape[1]
+
+            real = img[:,int(width/2):]
+        
+        return real
+            
+    
+    def first_processing_condition(self, data):
+        if self.condition_mode==None:
+            print('please select condition mode')
+            return None
+
+        elif self.condition_mode=='jpg':
+            img = image.imread(data)
+
+            height = img.shape[0]
+            width = img.shape[1]
+
+            condition = img[:, 0:int(width/2)]
+            condition_r = condition[:,:,0:1]
+            condition_g = condition[:,:,1:2]
+            condition_b = condition[:,:,2:3]
+
+            condition = condition_r/3 + condition_g/3 + condition_b/3 # conver to gray scale
+
+        return condition
+
     def to_FloatTensor(self,data):
         return torch.FloatTensor(data)
     
@@ -30,7 +72,6 @@ class transform_processing(object):
         data = data * scale + middle
         
         return data
-
 
     def MinMaxScale(self,data):
         scalar=MinMaxScaler(feature_range=(0,1))
@@ -59,24 +100,16 @@ class my_transform (object):
         self.condition_process = condition_process
     
     def __call__(self, sample):
-        real = sample['real']
-        condition = sample['condition']
-
         # real image processing
         if self.real_process:
             for process in self.real_process:
-                real = process(real)
+                sample['real'] = process(sample['real'])
 
         # condition processing
         if self.condition_process:
             for process in self.condition_process:
-                condition = process(condition)
-            
+                sample['condition'] = process(sample['condition'])
 
-        
-
-        sample['real'] = real
-        sample['condition'] = condition
         return sample
         
 

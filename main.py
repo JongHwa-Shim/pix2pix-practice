@@ -10,14 +10,13 @@ from make_dataset import *
 from model import *
 from save_load import *
 from postprocessing import *
-
-
+from func import sample_condition_generate
 ### hyperparameter
 ############################################################################################################################# 
 DEVICE = torch.device("cuda:0")
 #DEVICE = torch.device("cpu")
 
-LOAD_DATA = True
+LOAD_DATA = False
 SAVE_DATA = False
 LOAD_MODEL = False
 SAVE_MODEL = False
@@ -32,7 +31,7 @@ TEST_MODE = False
 if TEST_MODE:
     LOAD_MODEL = True
 
-BATCH_SIZE = 16
+BATCH_SIZE = 9
 SHUFFLE = True
 NUM_WORKERS = 0 # multithreading
 
@@ -61,15 +60,15 @@ else:
 
     ### preprocessing
     data_path = DATA_PATH
-    conditions, reals = PreProcessing(data_path, target_path=None, mode='jpg') 
+    conditions, reals = PreProcessing(data_path) 
 
     ### make dataset
     ##############################################################################
-    filter = transform_processing()
-    real_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
-    condition_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
+    filter = transform_processing(real_mode='jpg', condition_mode='jpg')
+    real_process = [filter.first_processing_real, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
+    condition_process = [filter.first_processing_condition, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
     transform = my_transform(real_process=real_process, condition_process=condition_process)
-
+    #transform = transforms.Compose()
     dataset = Mydataset(conditions, reals, transform)
 
     if SAVE_DATA:
@@ -118,29 +117,8 @@ idx = filter.to_LongTensor([[element] for element in range(10)])
 fixed_condition = [idx for _ in range(10)]
 fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
 """
-fixed_condition_list = []
-
 fixed_path = r'C:/USING_DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
-data_list = os.listdir(fixed_path)
-for i in range(25):
-    fixed_condition_path = fixed_path + '/' + data_list[i]
-    fixed_condition = image.imread(fixed_condition_path)
-
-    width = fixed_condition.shape[1]
-
-    fixed_condition = fixed_condition[:,0:int(width/2)]
-    fixed_condition_r = fixed_condition[:,:,0:1]
-    fixed_condition_g = fixed_condition[:,:,1:2]
-    fixed_condition_b = fixed_condition[:,:,2:3]
-    fixed_condition = fixed_condition_r/3 + fixed_condition_g/3 + fixed_condition_b/3
-
-    filter = transform_processing()
-    condition_process = [filter.to_FloatTensor, filter.Scaling, filter.final_processing]
-    for process in condition_process:
-        fixed_condition = process(fixed_condition)
-    fixed_condition_list.append(torch.unsqueeze(fixed_condition,0))
-
-fixed_condition = torch.cat(fixed_condition_list, dim=0).to(DEVICE)
+fixed_condition = sample_condition_generate(data_path=fixed_path, num=36, condition_process=condition_process, device=DEVICE)
 ##################################
 
 
@@ -172,6 +150,8 @@ for times in epoch:
 
             G_input = G_input_processing(G, DEVICE, data['condition'])
             fake_data = G(G_input)
+
+            #visualization(fake_data,'./files/fake_data.jpg',mode='RGB') just for test
 
             D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
             D_result_fake = D(D_input_fake)
@@ -216,12 +196,18 @@ for times in epoch:
     #####################################
 
     ### visualization 
+    #################################
     #G.eval()
     fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
-    generate_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
+    generated_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
+
+    ## concat condition and output image
+    fixed_condition = torch.cat([fixed_condition,fixed_condition,fixed_condition], dim=1)
+    generated_sample = torch.cat([fixed_condition, generated_sample], dim=3)
+
     path = './result/epoch ' + str(times) + '.jpg'
-    visualization(generate_sample,path,mode='RGB')
-    #square_plot(generate_sample.cpu().data.numpy(),path)
+    visualization(generated_sample,path,mode='RGB')
+    ##################################
 
     ### model save
     if SAVE_MODEL:

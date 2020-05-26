@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-from make_dataset import transform_processing as TP
+from make_dataset import transform_processing
 def visualization (data, path, mode='gray'):
 
     # batch will be n^2
@@ -84,9 +84,9 @@ def visualization (data, path, mode='gray'):
                 for i in range(height):
                     row = [ element for one_image in data[start:end,k] for element in one_image[i]]
                     sample_image[k].append(row)
-
-            start = start + n
-            end = end + n
+                start = start + n
+                end = end + n
+                
         sample_image = np.array(sample_image) # shape(3 x H x W)
       
         sample_height = sample_image.shape[1]
@@ -94,7 +94,7 @@ def visualization (data, path, mode='gray'):
 
         sample_image = np.transpose(sample_image,(1,2,0))
         #############################################
-        filter = TP()
+        filter = transform_processing(real_mode=None, condition_mode=None)
         sample_image = filter.Scaling(sample_image, range=[0,1], data_min=-1, data_max=1)
         plt.imsave(path, sample_image, vmin=-1, vmax=1) # image shape should be (H x W x 3)
         
