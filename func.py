@@ -5,7 +5,7 @@ import torch
 import os
 
 from preprocessing import PreProcessing
-from make_dataset import transform_processing
+from make_dataset import transform_func
 from postprocessing import visualization
 def pixel_analysis(path):
     img = image.imread(path)

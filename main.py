@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import Adam
+from torch.multiprocessing import freeze_support
 import time
 
 from preprocessing import *
@@ -16,22 +17,23 @@ from func import sample_condition_generate
 DEVICE = torch.device("cuda:0")
 #DEVICE = torch.device("cpu")
 
-LOAD_DATA = False
-SAVE_DATA = False
-LOAD_MODEL = False
-SAVE_MODEL = False
 
-DATA_PATH = r'C:/USING_DATA/pix2pix-dataset/edges2shoes/edges2shoes/train'
-DATASET_PATH = r'C:/USING_DATA/saved_data/pix2pix/DATASET'
+PROCESS_DATA = False
+DATA_PATH = r'C:/USING_DATA/DATASET/pix2pix-dataset/edges2shoes/edges2shoes/train'
+PROCESSED_DATA_ROOT = r'C:/USING_DATA/PROCESSED_DATA/pix2pix/train'
+FILE_PATH_LIST_PATH = r'C:/USING_DATA/PROCESSED_DATA/pix2pix/variables/file_path_list.file'
+FIXED_PATH = r'C:/USING_DATA/DATASET/pix2pix-dataset/edges2shoes/edges2shoes/val'
 
-G_PATH = "./model/generator.pkl"
-D_PATH = "./model/discriminator.pkl"
+SAVE_MODEL = True
+LOAD_MODEL = True
+G_PATH = r'C:/USING_DATA/MODEL/pix2pix/generator.model'
+D_PATH = r'C:/USING_DATA/MODEL/pix2pix/discriminator.model'
 
 TEST_MODE = False
 if TEST_MODE:
     LOAD_MODEL = True
 
-BATCH_SIZE = 9
+BATCH_SIZE = 4
 SHUFFLE = True
 NUM_WORKERS = 0 # multithreading
 
@@ -52,28 +54,31 @@ D_LENGTH = None
 
 ### preprocessing, make or load and save dataset
 ############################################################################################################################# 
-if LOAD_DATA == True:
+filter = transform_func(real_mode='jpg', condition_mode='jpg')
+real_process = [filter.first_processing_real, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
+condition_process = [filter.first_processing_condition, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
 
-    dataset = load_dataset(DATASET_PATH)
-
-else:
+if PROCESS_DATA:
 
     ### preprocessing
     data_path = DATA_PATH
-    conditions, reals = PreProcessing(data_path) 
+    sample_list = PreProcessing(data_path) 
 
     ### make dataset
     ##############################################################################
-    filter = transform_processing(real_mode='jpg', condition_mode='jpg')
-    real_process = [filter.first_processing_real, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
-    condition_process = [filter.first_processing_condition, filter.to_FloatTensor, filter.Scaling, filter.final_processing]
     transform = my_transform(real_process=real_process, condition_process=condition_process)
-    #transform = transforms.Compose()
-    dataset = Mydataset(conditions, reals, transform)
+    file_path_list = Transform_Processing(sample_list, transform, PROCESSED_DATA_ROOT)
 
-    if SAVE_DATA:
-        save_dataset(dataset, DATASET_PATH)
+    with open(FILE_PATH_LIST_PATH, 'wb') as f:
+        pickle.dump(file_path_list, f)
     ###############################################################################
+
+else:
+
+    with open(FILE_PATH_LIST_PATH, 'rb') as f:
+        file_path_list = pickle.load(f)
+
+dataset = PathDataset(file_path_list)
 
 ### make dataloader
 dataloader = DataLoader(dataset, batch_size = BATCH_SIZE, shuffle=SHUFFLE, num_workers=NUM_WORKERS)
@@ -94,8 +99,8 @@ print(params[0].size())
 ### model definition
 #################################
 if LOAD_MODEL:
-    G = load_model(G_PATH)
-    D = load_model(D_PATH)
+    G = load_model_state(Generator, G_PATH).to(DEVICE)
+    D = load_model_state(Discriminator, D_PATH).to(DEVICE)
 else:
     G = Generator().to(DEVICE)
     D = Discriminator().to(DEVICE)
@@ -117,102 +122,104 @@ idx = filter.to_LongTensor([[element] for element in range(10)])
 fixed_condition = [idx for _ in range(10)]
 fixed_condition = torch.cat(fixed_condition) # shape:(100,1)
 """
-fixed_path = r'C:/USING_DATA/pix2pix-dataset/edges2shoes/edges2shoes/val'
-fixed_condition = sample_condition_generate(data_path=fixed_path, num=36, condition_process=condition_process, device=DEVICE)
+fixed_condition = sample_condition_generate(data_path=FIXED_PATH, num=25, condition_process=condition_process, device=DEVICE)
 ##################################
 
 
 ### training, evaluate, log and model save
 ##########################################################################################
-epoch = range(EPOCH)
-for times in epoch:
-    start_time = time.time()
+if __name__ == '__main__': #for multiprocessing
 
-    D_losses = []
-    G_losses = []
-    batch_len = len(dataloader)
-    for num, data in enumerate(dataloader):
+    epoch = range(EPOCH)
+    for times in epoch:
+        start_time = time.time()
 
-        data['real'] = data['real'].to(DEVICE)
-        data['condition'] = data['condition'].to(DEVICE) # some trick
+        D_losses = []
+        G_losses = []
+        batch_len = len(dataloader)
 
-        ### fitting batch size
-        batch_size = data['condition'].size(0)
-        REAL_ANSWER = torch.ones([batch_size, 1, 16, 16]).to(DEVICE)
-        FAKE_ANSWER = torch.zeros([batch_size, 1, 16, 16]).to(DEVICE)
+        for data in dataloader:
 
-        G.train()
-        D.train()
-        ### train discriminator
-        for i in range(NUM_LEARN_D):
-            D_input_real = D_input_processing(D, DEVICE, data['real'], data['condition'])
-            D_result_real = D(D_input_real)
+            data['real'] = data['real'].to(DEVICE)
+            data['condition'] = data['condition'].to(DEVICE) # some trick
 
-            G_input = G_input_processing(G, DEVICE, data['condition'])
-            fake_data = G(G_input)
+            ### fitting batch size
+            batch_size = data['condition'].size(0)
+            REAL_ANSWER = torch.ones([batch_size, 1, 16, 16]).to(DEVICE)
+            FAKE_ANSWER = torch.zeros([batch_size, 1, 16, 16]).to(DEVICE)
 
-            #visualization(fake_data,'./files/fake_data.jpg',mode='RGB') just for test
+            G.train()
+            D.train()
+            ### train discriminator
+            for i in range(NUM_LEARN_D):
+                D_input_real = D_input_processing(D, DEVICE, data['real'], data['condition'])
+                D_result_real = D(D_input_real)
 
-            D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
-            D_result_fake = D(D_input_fake)
+                G_input = G_input_processing(G, DEVICE, data['condition'])
+                fake_data = G(G_input)
 
-            D_loss_args = {'D_result_real': D_result_real, 'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'fake_answer': FAKE_ANSWER}
+                #visualization(fake_data,'./files/fake_data.jpg',mode='RGB') just for test
 
-            D_loss, D_loss_real, D_loss_fake = D_CRITERION(**D_loss_args)
-            D_losses.append(D_loss.data)
+                D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
+                D_result_fake = D(D_input_fake)
 
-            D.zero_grad()
-            D_loss.backward()
-            D_OPTIMIZER.step()
-        
-        ### train generator
-        for i in range(NUM_LEARN_G):
-            G_input = G_input_processing(G, DEVICE, data['condition'])
-            fake_data = G(G_input)
+                D_loss_args = {'D_result_real': D_result_real, 'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'fake_answer': FAKE_ANSWER}
 
-            D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
-            D_result_fake = D(D_input_fake)
+                D_loss, D_loss_real, D_loss_fake = D_CRITERION(**D_loss_args)
+                D_losses.append(D_loss.data)
 
-            G_loss_args = {'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'real_data': data['real'], 'fake_data': fake_data, 'lambda': 100}
+                D.zero_grad()
+                D_loss.backward()
+                D_OPTIMIZER.step()
+            
+            ### train generator
+            for i in range(NUM_LEARN_G):
+                G_input = G_input_processing(G, DEVICE, data['condition'])
+                fake_data = G(G_input)
 
-            G_loss = G_CRITERION(**G_loss_args)
-            G_losses.append(G_loss.data)
+                D_input_fake = D_input_processing(D, DEVICE, fake_data, data['condition'])
+                D_result_fake = D(D_input_fake)
 
-            G.zero_grad()
-            G_loss.backward()
-            G_OPTIMIZER.step()
+                G_loss_args = {'D_result_fake': D_result_fake, 'real_answer': REAL_ANSWER, 'real_data': data['real'], 'fake_data': fake_data, 'lambda': 100}
 
-    ### log
-    #####################################
-    end_time = time.time()
-    running_time = int(end_time - start_time)
-    hour = int(running_time / 3600)
-    minute = int((running_time - hour*3600) / 60)
-    second = running_time - hour*3600 - minute*60
+                G_loss = G_CRITERION(**G_loss_args)
+                G_losses.append(G_loss.data)
 
-    print("Epoch: " + str(times))
-    print("Time: " + str(hour) + 'h' + '   ' + str(minute) + 'm' + '   '+ str(second) + 's')
-    print("Average G Loss:", float(sum(G_losses)/len(G_losses)), "     Average D Loss", float(sum(D_losses)/len(D_losses)), "\n")
-    #####################################
+                G.zero_grad()
+                G_loss.backward()
+                G_OPTIMIZER.step()
 
-    ### visualization 
-    #################################
-    #G.eval()
-    fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
-    generated_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
+        ### log
+        #####################################
+        end_time = time.time()
+        running_time = int(end_time - start_time)
+        hour = int(running_time / 3600)
+        minute = int((running_time - hour*3600) / 60)
+        second = running_time - hour*3600 - minute*60
 
-    ## concat condition and output image
-    fixed_condition = torch.cat([fixed_condition,fixed_condition,fixed_condition], dim=1)
-    generated_sample = torch.cat([fixed_condition, generated_sample], dim=3)
+        print("Epoch: " + str(times))
+        print("Time: " + str(hour) + 'h' + '   ' + str(minute) + 'm' + '   '+ str(second) + 's')
+        print("Average G Loss:", float(sum(G_losses)/len(G_losses)), "     Average D Loss", float(sum(D_losses)/len(D_losses)), "\n")
+        #####################################
 
-    path = './result/epoch ' + str(times) + '.jpg'
-    visualization(generated_sample,path,mode='RGB')
-    ##################################
+        ### visualization 
+        #################################
+        #G.eval()
+        fixed_G_input = G_input_processing(G, DEVICE, fixed_condition, mode='val')
+        generated_sample = G(fixed_G_input) # shape: (Batch_size, 3, 256, 256)
 
-    ### model save
-    if SAVE_MODEL:
-        save_model(G_PATH)
-        save_model(D_PATH)
+        ## concat condition and output image
+        fixed_condition__ = torch.cat([fixed_condition,fixed_condition,fixed_condition], dim=1)
+        generated_sample = torch.cat([fixed_condition__, generated_sample], dim=3)
+
+        path = './result/epoch ' + str(times) + '.jpg'
+        visualization(generated_sample,path,mode='RGB')
+        ##################################
+
+        ### model save
+        if SAVE_MODEL:
+            save_model_state(G.state_dict(), G_PATH)
+            save_model_state(D.state_dict(), D_PATH)
 ############################################################################################
 
 ### 테스트용 코드를 아예 따로 짜자...

@@ -7,8 +7,9 @@ from PIL import Image
 from matplotlib import image
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
+import pickle as pk
 
-class transform_processing(object):
+class transform_func(object):
     def __init__(self, real_mode=None, condition_mode=None):
         self.real_mode = real_mode
         self.condition_mode = condition_mode
@@ -101,16 +102,21 @@ class my_transform (object):
     
     def __call__(self, sample):
         # real image processing
+        
+        sample_ = {}
+        sample_['real'] = sample['real']
+        sample_['condition'] = sample['condition']
+        
         if self.real_process:
             for process in self.real_process:
-                sample['real'] = process(sample['real'])
+                sample_['real'] = process(sample_['real'])
 
         # condition processing
         if self.condition_process:
             for process in self.condition_process:
-                sample['condition'] = process(sample['condition'])
+                sample_['condition'] = process(sample_['condition'])
 
-        return sample
+        return sample_
         
 
 class Mydataset(Dataset):
@@ -126,7 +132,7 @@ class Mydataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        sample = {}
+        sample = {} # make copy of sample for efficient memory usage
         sample['real'] = self.reals[idx]
 
         if self.conditions == None: # if model don't use condition
@@ -138,4 +144,22 @@ class Mydataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+
+class PathDataset(Dataset):
+    def __init__(self, file_path_list):
+        self.file_path_list = file_path_list
+
+    def __len__(self):
+        return len(self.file_path_list)
+    
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        file_path = self.file_path_list[idx]
+        with open(file_path, 'rb') as f:
+            sample = pk.load(f)
+        
+        return sample
+        
 

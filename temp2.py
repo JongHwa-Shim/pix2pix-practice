@@ -63,6 +63,7 @@ idx = [[element] for element in range(10)]
 idx = filter.to_LongTensor(idx)
 """
 
-a = torch.ones([25,1,30,30])
+a = 3
+del a
 
-b=1
+b=2

@@ -6,7 +6,7 @@ import csv
 import torch
 from torchvision import transforms
 from sklearn.preprocessing import MinMaxScaler
-
+import pickle as pk
 def deprecate(source_path, target_path=None, mode=None):
     sources = []
     targets = []
@@ -67,15 +67,40 @@ def deprecate(source_path, target_path=None, mode=None):
     # source = condition, target = real
 
 def PreProcessing(data_path):
-    source_list = []
-    target_list = []
+    sample_list = []
 
     root = data_path
     data_list = os.listdir(root)
 
     for data in data_list:
         data_path = root + '/' + data
-        source_list.append(data_path)
-        target_list.append(data_path)
+        sample = {}
+        sample['condition'] = data_path
+        sample['real'] = data_path
+        sample_list.append(sample)
     
-    return source_list, target_list
+    return sample_list
+
+def Transform_Processing(sample_list, transform, root_path):
+    file_name = '/sample_'
+    file_num = 0
+    file_extention = '.jpg'
+
+    #file_len = len(sample_list)
+
+    file_path_list = []
+    for sample in sample_list:
+        sample_ = transform(sample)
+
+        file_path = root_path + file_name + str(file_num) + file_extention
+        file_path_list.append(file_path)
+        with open(file_path, 'wb') as f:
+            pk.dump(sample_, f)
+        
+        del sample # experiment
+        
+        file_num = file_num + 1
+    
+    return file_path_list
+
+
